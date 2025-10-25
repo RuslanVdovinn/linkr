@@ -3,7 +3,6 @@ package migrations
 import (
 	"database/sql"
 	"embed"
-	"fmt"
 	"log"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -11,7 +10,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-//go:embed../../../migrations/*.sql
+//go:embed migrations
 var fs embed.FS
 
 func Up(db *sql.DB) error {
@@ -19,7 +18,7 @@ func Up(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	d, err := iofs.New(fs, "sql")
+	d, err := iofs.New(fs, "migrations")
 	if err != nil {
 		return err
 	}
@@ -28,7 +27,7 @@ func Up(db *sql.DB) error {
 		return err
 	}
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		fmt.Println("migrations up: %w", err)
+		log.Println("migrations up: %w", err)
 	}
 	log.Println("migrations: up OK")
 	return nil

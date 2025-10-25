@@ -1,8 +1,8 @@
 CREATE TABLE app_user (
     id         BIGSERIAL PRIMARY KEY,
-    email      CITEXT UNIQUE NOT NULL,
+    email      VARCHAR(100) UNIQUE NOT NULL,
     name       TEXT,
-    created_at TIMESTAMPZ NOT NULL DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE api_key (
