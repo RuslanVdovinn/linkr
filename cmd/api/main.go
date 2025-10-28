@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"linkr/internal/http/handlers"
 	"linkr/internal/migrations"
 	"log"
 	"net/http"
@@ -16,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
 )
 
@@ -47,11 +48,13 @@ func main() {
 
 func routes() http.Handler {
 	r := chi.NewRouter()
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-	})
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
+	r.Get("/health", handlers.Health)
+	r.Route("/{alias}", handlers.Alias)
 	return r
 }
 
