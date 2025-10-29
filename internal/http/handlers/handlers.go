@@ -1,11 +1,10 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
 )
 
 func Health(w http.ResponseWriter, r *http.Request) {
@@ -14,12 +13,22 @@ func Health(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func Alias(r chi.Router) {
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+func Alias(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		alias, _ := parseAlias(r)
 		log.Printf("Searcing alias: %s", alias)
-
-	})
+		var url string
+		err := db.QueryRowContext(r.Context(),
+			"SELECT target_url FROM link WHERE alias=$1", alias,
+		).Scan(&url)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, "not found", 404)
+			return
+		}
+		log.Printf("Redirect to %s", url)
+		http.Redirect(w, r, url, http.StatusFound)
+	}
 }
 
 func parseAlias(r *http.Request) (string, error) {

@@ -22,14 +22,15 @@ import (
 
 func main() {
 	godotenv.Load()
-	migrate()
+	db := migrate()
+	defer db.Close()
 	addr, ok := os.LookupEnv("HTTP_ADDR")
 	if !ok {
 		addr = ":8080"
 	}
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: routes(),
+		Handler: routes(db),
 	}
 	go func() {
 		log.Printf("listening on %s", addr)
@@ -46,7 +47,7 @@ func main() {
 	log.Println("server stopped")
 }
 
-func routes() http.Handler {
+func routes(db *sql.DB) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -54,11 +55,13 @@ func routes() http.Handler {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
 	r.Get("/health", handlers.Health)
-	r.Route("/{alias}", handlers.Alias)
+	r.Route("/{alias}", func(r chi.Router) {
+		r.Get("/", handlers.Alias(db))
+	})
 	return r
 }
 
-func migrate() {
+func migrate() *sql.DB {
 	dbName, ok := os.LookupEnv("DB_USER")
 	if !ok {
 		log.Println("Missing DB_USER")
@@ -73,7 +76,8 @@ func migrate() {
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+	db.SetMaxOpenConns(20)
+	db.SetMaxIdleConns(10)
 
 	if err := db.Ping(); err != nil {
 		panic(err)
@@ -81,4 +85,5 @@ func migrate() {
 	if err := migrations.Up(db); err != nil {
 		panic(err)
 	}
+	return db
 }
