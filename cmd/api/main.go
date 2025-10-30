@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"linkr/internal/http/handlers"
 	"linkr/internal/migrations"
@@ -13,7 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	// "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,7 +25,8 @@ import (
 
 func main() {
 	godotenv.Load()
-	db := migrate()
+	gormDB := connect()
+	db, _ := gormDB.DB()
 	defer db.Close()
 	addr, ok := os.LookupEnv("HTTP_ADDR")
 	if !ok {
@@ -30,7 +34,7 @@ func main() {
 	}
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: routes(db),
+		Handler: routes(gormDB),
 	}
 	go func() {
 		log.Printf("listening on %s", addr)
@@ -47,7 +51,7 @@ func main() {
 	log.Println("server stopped")
 }
 
-func routes(db *sql.DB) http.Handler {
+func routes(db *gorm.DB) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -61,7 +65,7 @@ func routes(db *sql.DB) http.Handler {
 	return r
 }
 
-func migrate() *sql.DB {
+func connect() *gorm.DB {
 	dbName, ok := os.LookupEnv("DB_USER")
 	if !ok {
 		log.Println("Missing DB_USER")
@@ -72,17 +76,19 @@ func migrate() *sql.DB {
 		log.Println("Missing DB_PASSWORD")
 		os.Exit(1)
 	}
-	db, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@localhost:32768/postgres?sslmode=disable", dbName, dbPassword))
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32768/postgres?sslmode=disable", dbName, dbPassword)),
+		&gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
 	if err != nil {
 		panic(err)
 	}
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(10)
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(10)
 
-	if err := db.Ping(); err != nil {
+	if err := sqlDB.Ping(); err != nil {
 		panic(err)
 	}
-	if err := migrations.Up(db); err != nil {
+	if err := migrations.Up(sqlDB); err != nil {
 		panic(err)
 	}
 	return db
