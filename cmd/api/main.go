@@ -62,6 +62,7 @@ func routes(db *gorm.DB) http.Handler {
 	r.Route("/{alias}", func(r chi.Router) {
 		r.Get("/", handlers.Alias(db))
 	})
+	r.Post("/links", handlers.CreateLink(db))
 	return r
 }
 
@@ -76,7 +77,7 @@ func connect() *gorm.DB {
 		log.Println("Missing DB_PASSWORD")
 		os.Exit(1)
 	}
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32768/postgres?sslmode=disable", dbName, dbPassword)),
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32795/postgres?sslmode=disable", dbName, dbPassword)),
 		&gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
 	if err != nil {
 		panic(err)

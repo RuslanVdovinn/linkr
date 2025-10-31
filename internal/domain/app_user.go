@@ -5,7 +5,7 @@ import "time"
 type AppUser struct {
 	ID        int64     `gorm:"column:id;primaryKey"`
 	Email     string    `gorm:"column:email"`
-	Nmail     string    `gorm:"column:name"`
+	Name      string    `gorm:"column:name"`
 	CreatedAt time.Time `gorm:"column:created_at"                  json:"created_at"`
 }
 

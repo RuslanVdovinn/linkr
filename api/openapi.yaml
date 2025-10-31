@@ -1,0 +1,442 @@
+openapi: 3.0.3
+info:
+  title: linkr API
+  version: 0.1.0
+  description: >-
+    REST API для сокращения ссылок и сбора аналитики. Скелет контракта без реализации.
+servers:
+  - url: https://api.linkr.local
+    description: Local/Dev
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+paths:
+  "/{alias}":
+    get:
+      summary: Resolve short link and redirect (public edge)
+      description: Возвращает 302/301 с Location на target_url. В контракте показан как 200 для удобства тестов, но фактический сервер будет отдавать 302.
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{3,64}$"
+      responses:
+        '200':
+          description: Simulated redirect payload for tests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkRedirect'
+        '404':
+          description: Not found or inactive/expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  "/api/v1/links":
+    post:
+      summary: Create short link
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkResponse'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  "/api/v1/links/{alias}":
+    get:
+      summary: Get link by alias
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      summary: Update link
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkUpdateRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      summary: Delete link
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+      responses:
+        '204':
+          description: Deleted
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  "/api/v1/links/{alias}/stats":
+    get:
+      summary: Aggregated stats for a link
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+        - $ref: '#/components/parameters/FromParam'
+        - $ref: '#/components/parameters/ToParam'
+        - in: query
+          name: bucket
+          schema:
+            type: string
+            enum: [hour, day]
+            default: day
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  "/api/v1/links/{alias}/clicks":
+    get:
+      summary: Raw clicks (paginated)
+      security:
+        - ApiKeyAuth: []
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/AliasParam'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - in: query
+          name: after
+          schema:
+            type: string
+            description: Cursor/ID/TS for pagination
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClickEvent'
+                  next_after:
+                    type: string
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  "/api/v1/apikeys":
+    post:
+      summary: Create API key (returns raw once)
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scopes:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyCreateResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    get:
+      summary: List API keys (masked)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKeyMasked'
+  "/api/v1/apikeys/{id}":
+    delete:
+      summary: Revoke API key
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Revoked
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  "/healthz":
+    get:
+      summary: Liveness
+      responses:
+        '200':
+          description: OK
+
+  "/readyz":
+    get:
+      summary: Readiness
+      responses:
+        '200':
+          description: OK
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AliasParam:
+      name: alias
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z0-9_-]{3,64}$"
+    FromParam:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date-time
+    ToParam:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+    LinkCreateRequest:
+      type: object
+      required: [target_url]
+      properties:
+        target_url:
+          type: string
+          maxLength: 4096
+        alias:
+          type: string
+          pattern: "^[A-Za-z0-9_-]{3,64}$"
+        title: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        expire_at:
+          type: string
+          format: date-time
+
+    LinkUpdateRequest:
+      type: object
+      properties:
+        target_url: { type: string, maxLength: 4096 }
+        title: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        is_active: { type: boolean }
+        expire_at:
+          type: string
+          format: date-time
+
+    LinkResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        alias: { type: string }
+        short_url: { type: string }
+        target_url: { type: string }
+        title: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        is_active: { type: boolean }
+        expire_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    LinkRedirect:
+      type: object
+      properties:
+        alias: { type: string }
+        location: { type: string, description: 'Target URL' }
+
+    ClickEvent:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        ts: { type: string, format: date-time }
+        ip_hash: { type: string, nullable: true }
+        ua: { type: string, nullable: true }
+        referrer: { type: string, nullable: true }
+        country: { type: string, nullable: true }
+        utm_source: { type: string, nullable: true }
+        utm_medium: { type: string, nullable: true }
+        utm_campaign: { type: string, nullable: true }
+
+    StatsBucket:
+      type: object
+      properties:
+        ts: { type: string }
+        count: { type: integer, format: int64 }
+
+    StatsResponse:
+      type: object
+      properties:
+        alias: { type: string }
+        total: { type: integer, format: int64 }
+        buckets:
+          type: array
+          items: { $ref: '#/components/schemas/StatsBucket' }
+        top_referrers:
+          type: array
+          items:
+            type: object
+            properties:
+              referrer: { type: string }
+              count: { type: integer, format: int64 }
+        utm:
+          type: array
+          items:
+            type: object
+            properties:
+              source: { type: string }
+              medium: { type: string }
+              campaign: { type: string }
+              count: { type: integer, format: int64 }
+
+    ApiKeyCreateResponse:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        raw_key: { type: string, description: 'Показывается один раз' }
+        scopes:
+          type: array
+          items: { type: string }
+
+    ApiKeyMasked:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        prefix: { type: string }
+        scopes:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }

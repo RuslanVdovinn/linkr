@@ -37,6 +37,25 @@ func Alias(db *gorm.DB) http.HandlerFunc {
 	}
 }
 
+func CreateLink(db *gorm.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var link domain.Link
+		json.NewDecoder(r.Body).Decode(&link)
+		user := domain.AppUser{
+			ID:    1,
+			Email: "email",
+			Name:  "test",
+		}
+		link.User = &user
+		log.Printf("Req: %s", link)
+		if err := db.Create(&link).Error; err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		w.Write([]byte("{'status':'ok'}"))
+	}
+}
+
 func parseAlias(r *http.Request) (string, error) {
 	return r.URL.Path, nil
 }
