@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"linkr/internal/auth"
 	"linkr/internal/http/handlers"
+	"linkr/internal/http/middleware"
 	"linkr/internal/migrations"
 	"log"
 	"net/http"
@@ -19,12 +21,18 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	godotenv.Load()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+	token, err := auth.GenerateToken(1, "test@test.com", time.Hour)
+	log.Println(err)
+	log.Printf("Current token: %s", token)
 	gormDB := connect()
 	db, _ := gormDB.DB()
 	defer db.Close()
@@ -53,11 +61,12 @@ func main() {
 
 func routes(db *gorm.DB) http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(60 * time.Second))
+	r.Use(chimw.RequestID)
+	r.Use(chimw.RealIP)
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+	r.Use(chimw.Timeout(60 * time.Second))
+	r.Use(middleware.AuthBearerMiddleware)
 	r.Get("/health", handlers.Health)
 	r.Route("/{alias}", func(r chi.Router) {
 		r.Get("/", handlers.Alias(db))
@@ -82,7 +91,7 @@ func connect() *gorm.DB {
 		log.Println("Missing DB_PASSWORD")
 		os.Exit(1)
 	}
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32768/postgres?sslmode=disable", dbName, dbPassword)),
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32771/postgres?sslmode=disable", dbName, dbPassword)),
 		&gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
 	if err != nil {
 		panic(err)

@@ -18,14 +18,19 @@ type Claims struct {
 func getJwtKey() string {
 	val, ok := os.LookupEnv("JWT_KEY")
 	if !ok {
+		log.Println(ok)
+		log.Println(os.Environ())
 		log.Fatal("Missing JWT_KEY environment variable")
 	}
 	return val
 }
 
-var jwtSecret = []byte(getJwtKey())
+var jwtSecret []byte
 
 func GenerateToken(userID int64, email string, ttl time.Duration) (string, error) {
+	jwtKey := getJwtKey()
+	log.Printf("Current JWT_KEY=%s", jwtKey)
+	jwtSecret = []byte(getJwtKey())
 	claims := &Claims{
 		UserID: userID,
 		Email:  email,
@@ -35,7 +40,7 @@ func GenerateToken(userID int64, email string, ttl time.Duration) (string, error
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtSecret)
 }
 

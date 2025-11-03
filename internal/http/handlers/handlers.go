@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"linkr/internal/domain"
+	"linkr/internal/http/middleware"
 	"log"
 	"net/http"
 	"strings"
@@ -32,6 +33,12 @@ func Alias(db *gorm.DB) http.HandlerFunc {
 
 func GetAlias(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user := middleware.UserFromContest(r)
+		if user == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		log.Printf("logginig user %v", user)
 		alias, _ := parseAlias(r)
 		log.Printf("Searcing alias: %s", alias)
 		var link domain.Link
