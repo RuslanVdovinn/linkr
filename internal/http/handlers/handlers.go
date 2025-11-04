@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"linkr/internal/domain"
 	"linkr/internal/http/middleware"
+	"linkr/internal/utils"
 	"log"
 	"net/http"
 	"strings"
@@ -33,7 +34,7 @@ func Alias(db *gorm.DB) http.HandlerFunc {
 
 func GetAlias(db *gorm.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := middleware.UserFromContest(r)
+		user := middleware.UserFromContext(r)
 		if user == nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
@@ -79,7 +80,9 @@ func DeleteAlias(db *gorm.DB) http.HandlerFunc {
 			return
 		}
 		log.Printf("Successfully deleted alias: %s", alias)
-		w.Write([]byte("{'status':'ok'}"))
+		json.NewEncoder(w).Encode(utils.OkResponse{
+			Status: "Ok",
+		})
 	}
 }
 
@@ -98,7 +101,9 @@ func CreateLink(db *gorm.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		w.Write([]byte("{'status':'ok'}"))
+		json.NewEncoder(w).Encode(utils.OkResponse{
+			Status: "Ok",
+		})
 	}
 }
 

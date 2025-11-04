@@ -36,7 +36,7 @@ func AuthBearerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func UserFromContest(r *http.Request) *auth.Claims {
+func UserFromContext(r *http.Request) *auth.Claims {
 	claims, ok := r.Context().Value(UserCtxKey).(*auth.Claims)
 	if !ok {
 		return nil

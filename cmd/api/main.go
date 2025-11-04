@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	_ "github.com/lib/pq"
+	// _ "github.com/lib/pq"
 )
 
 func main() {
@@ -66,16 +66,16 @@ func routes(db *gorm.DB) http.Handler {
 	r.Use(chimw.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(60 * time.Second))
-	r.Use(middleware.AuthBearerMiddleware)
 	r.Get("/health", handlers.Health)
-	r.Route("/{alias}", func(r chi.Router) {
-		r.Get("/", handlers.Alias(db))
-	})
 	r.Route("/links", func(r chi.Router) {
+		r.Use(middleware.AuthBearerMiddleware)
 		r.Post("/", handlers.CreateLink(db))
 		r.Get("/{alias}", handlers.GetAlias(db))
 		r.Patch("/{alias}", handlers.PatchAlias(db))
 		r.Delete("/{alias}", handlers.DeleteAlias(db))
+	})
+	r.Route("/{alias[A-Za-z0-9_-]{3,64}}", func(r chi.Router) {
+		r.Get("/", handlers.Alias(db))
 	})
 	return r
 }
@@ -91,7 +91,7 @@ func connect() *gorm.DB {
 		log.Println("Missing DB_PASSWORD")
 		os.Exit(1)
 	}
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32771/postgres?sslmode=disable", dbName, dbPassword)),
+	db, err := gorm.Open(postgres.Open(fmt.Sprintf("postgres://%s:%s@localhost:32768/postgres?sslmode=disable", dbName, dbPassword)),
 		&gorm.Config{Logger: logger.Default.LogMode(logger.Info)})
 	if err != nil {
 		panic(err)
